@@ -1,0 +1,30 @@
+﻿@inherits LayoutComponentBase
+@code {
+    private bool displaySpinner = false;
+
+    public EventCallback<bool> DisplaySpinner => EventCallback.Factory.Create<bool>(this, DisplaySpinnerAction);
+
+    private void DisplaySpinnerAction(bool show)
+    {
+        displaySpinner = show;
+    }
+}
+
+<div class="page">
+    @if (displaySpinner)
+    {
+        <div class="overlay d-flex justify-content-center align-items-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+
+    <CascadingValue Value=DisplaySpinner>
+        <main>
+            <article class="container-fluid">
+                @Body
+            </article>
+        </main>
+    </CascadingValue>
+</div>
