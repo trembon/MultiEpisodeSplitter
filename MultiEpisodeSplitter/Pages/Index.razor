@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using FFMpegCore
+@using System.Text.RegularExpressions
 
 @code {
     private const string STATUS_WARNING = "warning";
@@ -8,6 +9,8 @@
 
     private const string STATUSTEXT_NO_FILE = "No file is selected, please select an episode file to split";
     private const string STATUSTEXT_FILE_SELECTED = "Please mark intro end, episode 2 and after texts";
+
+    private Regex episodeRegex = new Regex("S(\\d\\d)E(\\d\\d)-?E(\\d\\d)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private bool isFileOpen = false;
     private string filePath = null;
@@ -21,6 +24,13 @@
     private int rangeCurrent = 0;
     private int rangeSelected = 0;
     private int rangeEnd = 100;
+
+    private int? episodeIntroEnd;
+    private int? episodeTwoStart;
+    private int? episodeAfterTextStart;
+
+    private string episodeOneFile;
+    private string episodeTwoFile;
 
     [CascadingParameter]
     public EventCallback<bool> DisplaySpinner { get; set; }
@@ -53,6 +63,18 @@
                 isFileOpen = true;
                 status = STATUS_SUCCESS;
                 statusText = STATUSTEXT_FILE_SELECTED;
+
+                var match = episodeRegex.Match(result.FileName);
+                if (match.Groups.Count == 4)
+                {
+                    episodeOneFile = result.FileName.Replace(match.Value, $"S{match.Groups[1].Value}E{match.Groups[2].Value}");
+                    episodeTwoFile = result.FileName.Replace(match.Value, $"S{match.Groups[1].Value}E{match.Groups[3].Value}");
+                }
+                else
+                {
+                    episodeOneFile = "Show.E01" + Path.GetExtension(result.FileName);
+                    episodeTwoFile = "Show.E02" + Path.GetExtension(result.FileName);
+                }
             }
             catch (Exception ex)
             {
@@ -71,6 +93,13 @@
         rangeCurrent = 0;
         rangeSelected = 0;
         rangeEnd = 100;
+
+        episodeIntroEnd = null;
+        episodeTwoStart = null;
+        episodeAfterTextStart = null;
+
+        episodeOneFile = null;
+        episodeTwoFile = null;
 
         isFileOpen = false;
         base64image = null;
@@ -111,18 +140,33 @@
 
         return Task.CompletedTask;
     }
+
+    private void MarkIntroEnd()
+    {
+        episodeIntroEnd = rangeSelected;
+    }
+
+    private void MarkEpisodeTwoStart()
+    {
+        episodeTwoStart = rangeSelected;
+    }
+
+    private void MarkAfterTextStart()
+    {
+        episodeAfterTextStart = rangeSelected;
+    }
 }
 
 <div class="row">
     <div class="col">
         <button class="btn btn-dark" @onclick="OpenFile">Open file</button>
-        <button class="btn @(isFileOpen ? "btn-dark" : "btn-light")" @onclick="CloseFile" disabled="@(!isFileOpen)">Close file</button>
+        <button class="btn @(isFileOpen ? "btn-dark" : "btn-light")" @onclick=CloseFile disabled="@(!isFileOpen)">Close file</button>
 
         <div class="vr mx-3"></div>
 
-        <button class="btn btn-primary" disabled="@(!isFileOpen)">Mark intro end</button>
-        <button class="btn btn-success" disabled="@(!isFileOpen)">Mark episode 2 start</button>
-        <button class="btn btn-info" disabled="@(!isFileOpen)">Mark after text start</button>
+        <button class="btn btn-primary" @onclick=MarkIntroEnd disabled="@(!isFileOpen)">Mark intro end</button>
+        <button class="btn btn-success" @onclick=MarkEpisodeTwoStart disabled="@(!isFileOpen)">Mark episode 2 start</button>
+        <button class="btn btn-info" @onclick=MarkAfterTextStart disabled="@(!isFileOpen)">Mark after text start</button>
     </div>
 </div>
 
@@ -145,6 +189,22 @@
         <img class="rounded align-content-center img-fluid" src="@base64image" alt="No episode selected" />
     </div>
     <div class="col-4">
-        list of break points
+        <h3 class="text-center mb-5">Select points</h3>
+        @if (episodeIntroEnd.HasValue)
+        {
+            <p><b>Intro end:</b> @(episodeIntroEnd)s</p>
+        }
+        @if (episodeTwoStart.HasValue)
+        {
+            <p><b>Episode Two start:</b> @(episodeTwoStart)s</p>
+        }
+        @if (episodeAfterTextStart.HasValue)
+        {
+            <p><b>After texts start:</b> @(episodeAfterTextStart)s</p>
+        }
+
+        <h3 class="text-center my-5">Output files</h3>
+        <p>@episodeOneFile</p>
+        <p>@episodeTwoFile</p>
     </div>
 </div>
