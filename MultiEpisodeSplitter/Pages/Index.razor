@@ -1,6 +1,6 @@
 ﻿@page "/"
-@using FFMpegCore
-@using System.Text.RegularExpressions
+@using MultiEpisodeSplitter.Services;
+@inject IMediaInformationService mediaInformationService;
 
 @code {
     private const string STATUS_WARNING = "warning";
@@ -10,16 +10,12 @@
     private const string STATUSTEXT_NO_FILE = "No file is selected, please select an episode file to split";
     private const string STATUSTEXT_FILE_SELECTED = "Please mark intro end, episode 2 and after texts";
 
-    private Regex episodeRegex = new Regex("S(\\d\\d)E(\\d\\d)-?E(\\d\\d)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private bool isFileOpen = false;
-    private string filePath = null;
+    private Models.MediaInformation currentMedia;
 
     private string status = STATUS_WARNING;
     private string statusText = STATUSTEXT_NO_FILE;
 
     private string base64image;
-    private System.Drawing.Size videoSize;
 
     private int rangeCurrent = 0;
     private int rangeSelected = 0;
@@ -28,9 +24,6 @@
     private int? episodeIntroEnd;
     private int? episodeTwoStart;
     private int? episodeAfterTextStart;
-
-    private string episodeOneFile;
-    private string episodeTwoFile;
 
     [CascadingParameter]
     public EventCallback<bool> DisplaySpinner { get; set; }
@@ -50,31 +43,14 @@
 
             try
             {
-                filePath = result.FullPath;
-
-                var mediaInfo = await FFProbe.AnalyseAsync(filePath);
-                videoSize = new System.Drawing.Size(mediaInfo.PrimaryVideoStream.Width, mediaInfo.PrimaryVideoStream.Height);
-
-                await LoadImage(5);
+                currentMedia = await mediaInformationService.LoadMedia(result.FullPath);
+                base64image = await mediaInformationService.GetStillFromMediaAsBase64(currentMedia, 5);
 
                 rangeSelected = rangeCurrent = 5;
-                rangeEnd = (int)mediaInfo.Duration.TotalSeconds;
+                rangeEnd = (int)currentMedia.MediaData.Duration.TotalSeconds;
 
-                isFileOpen = true;
                 status = STATUS_SUCCESS;
                 statusText = STATUSTEXT_FILE_SELECTED;
-
-                var match = episodeRegex.Match(result.FileName);
-                if (match.Groups.Count == 4)
-                {
-                    episodeOneFile = result.FileName.Replace(match.Value, $"S{match.Groups[1].Value}E{match.Groups[2].Value}");
-                    episodeTwoFile = result.FileName.Replace(match.Value, $"S{match.Groups[1].Value}E{match.Groups[3].Value}");
-                }
-                else
-                {
-                    episodeOneFile = "Show.E01" + Path.GetExtension(result.FileName);
-                    episodeTwoFile = "Show.E02" + Path.GetExtension(result.FileName);
-                }
             }
             catch (Exception ex)
             {
@@ -98,12 +74,8 @@
         episodeTwoStart = null;
         episodeAfterTextStart = null;
 
-        episodeOneFile = null;
-        episodeTwoFile = null;
-
-        isFileOpen = false;
+        currentMedia = null;
         base64image = null;
-        videoSize = System.Drawing.Size.Empty;
     }
 
     private async Task OnRangeChanged(ChangeEventArgs args)
@@ -113,7 +85,7 @@
         await this.DisplaySpinner.InvokeAsync(true);
         try
         {
-            await LoadImage(rangeSelected);
+            base64image = await mediaInformationService.GetStillFromMediaAsBase64(currentMedia, rangeSelected);
         }
         catch (Exception ex)
         {
@@ -126,19 +98,6 @@
     private void OnRangeDrag(ChangeEventArgs args)
     {
         rangeCurrent = Convert.ToInt32(args.Value);
-    }
-
-    private Task LoadImage(int seconds)
-    {
-        var bitmap = FFMpeg.Snapshot(filePath, videoSize, TimeSpan.FromSeconds(seconds));
-
-        using (var ms = new MemoryStream())
-        {
-            bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
-            base64image = string.Format("data:image/jpeg;base64,{0}", Convert.ToBase64String(ms.GetBuffer()));
-        }
-
-        return Task.CompletedTask;
     }
 
     private void MarkIntroEnd()
@@ -160,13 +119,13 @@
 <div class="row">
     <div class="col">
         <button class="btn btn-dark" @onclick="OpenFile">Open file</button>
-        <button class="btn @(isFileOpen ? "btn-dark" : "btn-light")" @onclick=CloseFile disabled="@(!isFileOpen)">Close file</button>
+        <button class="btn @(currentMedia != null ? "btn-dark" : "btn-light")" @onclick=CloseFile disabled="@(currentMedia == null)">Close file</button>
 
         <div class="vr mx-3"></div>
 
-        <button class="btn btn-primary" @onclick=MarkIntroEnd disabled="@(!isFileOpen)">Mark intro end</button>
-        <button class="btn btn-success" @onclick=MarkEpisodeTwoStart disabled="@(!isFileOpen)">Mark episode 2 start</button>
-        <button class="btn btn-info" @onclick=MarkAfterTextStart disabled="@(!isFileOpen)">Mark after text start</button>
+        <button class="btn btn-primary" @onclick=MarkIntroEnd disabled="@(currentMedia == null)">Mark intro end</button>
+        <button class="btn btn-success" @onclick=MarkEpisodeTwoStart disabled="@(currentMedia == null)">Mark episode 2 start</button>
+        <button class="btn btn-info" @onclick=MarkAfterTextStart disabled="@(currentMedia == null)">Mark after text start</button>
     </div>
 </div>
 
@@ -183,7 +142,7 @@
                 @rangeCurrent/@(rangeEnd)s
             </div>
             <div class="col-11">
-                <input type="range" class="form-range" min="0" max="@rangeEnd" id="disabledRange" value="@rangeSelected" disabled="@(!isFileOpen)" @onchange=OnRangeChanged @oninput=OnRangeDrag>
+                <input type="range" class="form-range" min="0" max="@rangeEnd" id="disabledRange" value="@rangeSelected" disabled="@(currentMedia == null)" @onchange=OnRangeChanged @oninput=OnRangeDrag>
             </div>
         </div>
         <img class="rounded align-content-center img-fluid" src="@base64image" alt="No episode selected" />
@@ -203,8 +162,8 @@
             <p><b>After texts start:</b> @(episodeAfterTextStart)s</p>
         }
 
-        <h3 class="text-center my-5">Output files</h3>
+        @*<h3 class="text-center my-5">Output files</h3>
         <p>@episodeOneFile</p>
-        <p>@episodeTwoFile</p>
+        <p>@episodeTwoFile</p>*@
     </div>
 </div>

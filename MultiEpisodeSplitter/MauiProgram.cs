@@ -1,5 +1,6 @@
 ﻿using FFMpegCore;
 using Microsoft.AspNetCore.Components.WebView.Maui;
+using MultiEpisodeSplitter.Services;
 
 namespace MultiEpisodeSplitter;
 
@@ -20,9 +21,10 @@ public static class MauiProgram
 		builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
 
-        //builder.Services.AddSingleton<WeatherForecastService>();
+        builder.Services.AddSingleton<IMediaInformationService, MediaInformationService>();
+        builder.Services.AddSingleton<IMediaSplitService, MediaSplitService>();
 
-        GlobalFFOptions.Configure(options => options.BinaryFolder = @"C:\Users\Christopher\Downloads\ffmpeg-2021-02-07-git-a52b9464e4-full_build\bin");
+        GlobalFFOptions.Configure(options => options.BinaryFolder = @"C:\bin\ffmpeg");
 
         return builder.Build();
 	}
