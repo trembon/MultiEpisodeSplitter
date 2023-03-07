@@ -1,11 +1,5 @@
-﻿using FFMpegCore.Enums;
-using FFMpegCore;
+﻿using FFMpegCore;
 using MultiEpisodeSplitter.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MultiEpisodeSplitter.Services
 {

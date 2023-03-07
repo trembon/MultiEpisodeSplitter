@@ -8,7 +8,7 @@
     private const string STATUS_ERROR = "error";
 
     private const string STATUSTEXT_NO_FILE = "No file is selected, please select an episode file to split";
-    private const string STATUSTEXT_FILE_SELECTED = "Please mark intro end, episode 2 and after texts";
+    private const string STATUSTEXT_FILE_SELECTED = "Please mark episodes to split file";
 
     private Models.MediaInformation currentMedia;
 
@@ -117,23 +117,38 @@
 }
 
 <div class="row">
+    <div class="col-auto">
+        <h1>Multi Episode Splitter</h1>
+    </div>
     <div class="col">
-        <button class="btn btn-dark" @onclick="OpenFile">Open file</button>
-        <button class="btn @(currentMedia != null ? "btn-dark" : "btn-light")" @onclick=CloseFile disabled="@(currentMedia == null)">Close file</button>
-
-        <div class="vr mx-3"></div>
-
-        <button class="btn btn-primary" @onclick=MarkIntroEnd disabled="@(currentMedia == null)">Mark intro end</button>
-        <button class="btn btn-success" @onclick=MarkEpisodeTwoStart disabled="@(currentMedia == null)">Mark episode 2 start</button>
-        <button class="btn btn-info" @onclick=MarkAfterTextStart disabled="@(currentMedia == null)">Mark after text start</button>
+        <div class="alert alert-@status mb-0" role="alert">
+            @statusText
+        </div>
     </div>
 </div>
 
 <hr />
 
-<div class="alert alert-@status" role="alert">
-    @statusText
+<div class="row mb-3">
+    <div class="col-auto">
+        <button class="btn btn-dark" @onclick="OpenFile">Open file</button>
+    </div>
+    <div class="col">
+        <input class="form-control" type="text" placeholder="Currently open file" readonly value="@Path.GetFileName(currentMedia?.FullPath)" />
+    </div>
 </div>
+
+<div class="row">
+    <div class="col">
+        <button class="btn btn-secondary me-2" @onclick=MarkIntroEnd disabled="@(currentMedia == null)">Mark episode start</button>
+        <button class="btn btn-secondary me-2" @onclick=MarkEpisodeTwoStart disabled="@(currentMedia == null)">Mark episode end</button>
+    </div>
+    <div class="col-auto">
+        <button class="btn @(currentMedia != null ? "btn-dark" : "btn-light")" @onclick=CloseFile disabled="@(currentMedia == null)">Close file</button>
+    </div>
+</div>
+
+<hr />
 
 <div class="row image-container">
     <div class="col-8">

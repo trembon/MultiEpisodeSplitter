@@ -1,16 +1,14 @@
 ﻿using MultiEpisodeSplitter.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.IO;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace MultiEpisodeSplitter.Services
 {
     internal interface IMediaSplitService
     {
         Task SplitMedia(MediaInformation media, IEnumerable<SplitMarking> splits, CancellationToken cancellationToken);
+
+        IEnumerable<string> CalculateFileNames(MediaInformation media, IEnumerable<SplitMarking> splits);
     }
 
     internal class MediaSplitService : IMediaSplitService
@@ -20,11 +18,37 @@ namespace MultiEpisodeSplitter.Services
         public Task SplitMedia(MediaInformation media, IEnumerable<SplitMarking> splits, CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
+
+
+            //// split
+            //string streamMaps = string.Join(' ', streams.Select(x => $"-map {x}"));
+
+            //string arguments = $"-i \"{file}\" -ss {start.ToString().Replace(',', '.')} -vcodec copy -c:a copy {streamMaps} \"{output}\"";
+            //if (end.HasValue)
+            //    arguments = $"-i \"{file}\" -ss {start.ToString().Replace(',', '.')} -to {end.Value.ToString().Replace(',', '.')} -vcodec copy -c:a copy {streamMaps} \"{output}\"";
+
+            //_ = StartFFMPEG(ffmpegPath, arguments);
+
+
+            //// create index file for ffmpeg to merge
+            //List<string> outputLines = new(files.Length);
+            //foreach (string file in files)
+            //    outputLines.Add($"file '{file}'");
+
+            //File.WriteAllLines(output, outputLines);
+
+
+            //// concat
+            //string streamMaps = string.Join(' ', streams.Select(x => $"-map {x}"));
+            //_ = StartFFMPEG(ffmpegPath, $"-f concat -safe 0 -i \"{inputList}\" -vcodec copy -c:a copy {streamMaps} \"{output}\"");
         }
 
-        private IEnumerable<string> CalculateFileNames(string fullPath, IEnumerable<SplitMarking> splits)
+        public IEnumerable<string> CalculateFileNames(MediaInformation media, IEnumerable<SplitMarking> splits)
         {
-            string fileName = Path.GetFileName(fullPath);
+            if(splits == null || !splits.Any())
+                return Array.Empty<string>();
+
+            string fileName = Path.GetFileName(media.FullPath);
             var match = episodeRegex.Match(fileName);
             if (match.Groups.Count == 4)
             {
