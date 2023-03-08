@@ -6,6 +6,6 @@
         public int End { get; set; }
 
         public bool IsIntro { get; set; }
-        public bool IsAfterTexts { get; set; }
+        public bool IsOutro { get; set; }
     }
 }

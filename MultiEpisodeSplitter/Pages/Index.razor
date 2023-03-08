@@ -1,6 +1,8 @@
 ﻿@page "/"
+@using MultiEpisodeSplitter.Models;
 @using MultiEpisodeSplitter.Services;
 @inject IMediaInformationService mediaInformationService;
+@inject IMediaSplitService mediaSplitService;
 
 @code {
     private const string STATUS_WARNING = "warning";
@@ -11,6 +13,7 @@
     private const string STATUSTEXT_FILE_SELECTED = "Please mark episodes to split file";
 
     private Models.MediaInformation currentMedia;
+    private List<Models.SplitMarking> splits = new();
 
     private string status = STATUS_WARNING;
     private string statusText = STATUSTEXT_NO_FILE;
@@ -20,10 +23,6 @@
     private int rangeCurrent = 0;
     private int rangeSelected = 0;
     private int rangeEnd = 100;
-
-    private int? episodeIntroEnd;
-    private int? episodeTwoStart;
-    private int? episodeAfterTextStart;
 
     [CascadingParameter]
     public EventCallback<bool> DisplaySpinner { get; set; }
@@ -70,11 +69,8 @@
         rangeSelected = 0;
         rangeEnd = 100;
 
-        episodeIntroEnd = null;
-        episodeTwoStart = null;
-        episodeAfterTextStart = null;
-
         currentMedia = null;
+        splits = new();
         base64image = null;
     }
 
@@ -100,19 +96,29 @@
         rangeCurrent = Convert.ToInt32(args.Value);
     }
 
-    private void MarkIntroEnd()
+    private void MarkIntro()
     {
-        episodeIntroEnd = rangeSelected;
+        splits = mediaSplitService.AddSplitIntro(rangeSelected, currentMedia, splits);
     }
 
-    private void MarkEpisodeTwoStart()
+    private void MarkEpisodeStart()
     {
-        episodeTwoStart = rangeSelected;
+        splits = mediaSplitService.AddSplitStart(rangeSelected, currentMedia, splits);
     }
 
-    private void MarkAfterTextStart()
+    private void MarkEpisodeEnd()
     {
-        episodeAfterTextStart = rangeSelected;
+        splits = mediaSplitService.AddSplitEnd(rangeSelected, currentMedia, splits);
+    }
+
+    private void MarkOutro()
+    {
+        splits = mediaSplitService.AddSplitOutro(rangeSelected, currentMedia, splits);
+    }
+
+    private void RemoveSplit(SplitMarking split)
+    {
+        splits.Remove(split);
     }
 }
 
@@ -140,8 +146,10 @@
 
 <div class="row">
     <div class="col">
-        <button class="btn btn-secondary me-2" @onclick=MarkIntroEnd disabled="@(currentMedia == null)">Mark episode start</button>
-        <button class="btn btn-secondary me-2" @onclick=MarkEpisodeTwoStart disabled="@(currentMedia == null)">Mark episode end</button>
+        <button class="btn btn-secondary me-2" @onclick=MarkIntro disabled="@(currentMedia == null)">Mark intro</button>
+        <button class="btn btn-secondary me-2" @onclick=MarkEpisodeStart disabled="@(currentMedia == null)">Mark episode start</button>
+        <button class="btn btn-secondary me-2" @onclick=MarkEpisodeEnd disabled="@(currentMedia == null)">Mark episode end</button>
+        <button class="btn btn-secondary me-2" @onclick=MarkOutro disabled="@(currentMedia == null)">Mark outro</button>
     </div>
     <div class="col-auto">
         <button class="btn @(currentMedia != null ? "btn-dark" : "btn-light")" @onclick=CloseFile disabled="@(currentMedia == null)">Close file</button>
@@ -164,21 +172,27 @@
     </div>
     <div class="col-4">
         <h3 class="text-center mb-5">Select points</h3>
-        @if (episodeIntroEnd.HasValue)
+
+        @foreach(var split in splits)
         {
-            <p><b>Intro end:</b> @(episodeIntroEnd)s</p>
-        }
-        @if (episodeTwoStart.HasValue)
-        {
-            <p><b>Episode Two start:</b> @(episodeTwoStart)s</p>
-        }
-        @if (episodeAfterTextStart.HasValue)
-        {
-            <p><b>After texts start:</b> @(episodeAfterTextStart)s</p>
+            if (split.IsIntro)
+            {
+                <p><b>Intro:</b> @(split.Start)s - @(split.End)s <span style="cursor: pointer;" @onclick="() => RemoveSplit(split)">X</span></p>
+            }
+            else if (split.IsOutro)
+            {
+                <p><b>Outro:</b> @(split.Start)s - @(split.End)s <span style="cursor: pointer;" @onclick="() => RemoveSplit(split)">X</span></p>
+            }
+            else
+            {
+                <p><b>Split:</b> @(split.Start)s - @(split.End)s <span style="cursor: pointer;" @onclick="() => RemoveSplit(split)">X</span></p>
+            }
         }
 
-        @*<h3 class="text-center my-5">Output files</h3>
-        <p>@episodeOneFile</p>
-        <p>@episodeTwoFile</p>*@
+        <h3 class="text-center my-5">Output files</h3>
+        @foreach(string filename in mediaSplitService.CalculateFileNames(currentMedia, splits))
+        {
+            <p>@filename</p>
+        }
     </div>
 </div>
