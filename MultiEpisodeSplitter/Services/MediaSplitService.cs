@@ -42,15 +42,6 @@ namespace MultiEpisodeSplitter.Services
                 });
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), args.Arguments);
-
-                //await FFMpeg.SubVideoAsync(media.FullPath, tempFilename + ".intro.mkv", TimeSpan.FromSeconds(intro.Start), TimeSpan.FromSeconds(intro.End));
-                //await FFMpegArguments.FromFileInput(media.FullPath, verifyExists: true, delegate (FFMpegArgumentOptions options)
-                //{
-                //    options.Seek(TimeSpan.FromSeconds(intro.Start)).EndSeek(TimeSpan.FromSeconds(intro.End));
-                //}).OutputToFile(output, overwrite: true, delegate (FFMpegArgumentOptions options)
-                //{
-                //    options.CopyChannel();
-                //}).ProcessAsynchronously();
             }
 
             var outro = splits.FirstOrDefault(x => x.IsOutro);
@@ -66,16 +57,12 @@ namespace MultiEpisodeSplitter.Services
                 });
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), args.Arguments);
-                // should use -map 0 -map -0:s (all streams, except subtitle)
-                // test with -map 0 (all streams)
-                //await FFMpeg.SubVideoAsync(media.FullPath, tempFilename + ".outro.mkv", TimeSpan.FromSeconds(outro.Start), TimeSpan.FromSeconds(outro.End));
             }
 
             var episodes = splits.Where(x => !x.IsIntro && !x.IsOutro).ToList();
             for(int i = 0; i < episodes.Count; i++)
             {
-                //await FFMpeg.SubVideoAsync(media.FullPath, tempFilename + ".ep" + (i + 1) + ".mkv", TimeSpan.FromSeconds(episodes[i].Start), TimeSpan.FromSeconds(episodes[i].End));
-
+                // split the episode
                 var args = FFMpegArguments.FromFileInput(media.FullPath, verifyExists: true, delegate (FFMpegArgumentOptions options)
                 {
                     options.Seek(TimeSpan.FromSeconds(episodes[i].Start)).EndSeek(TimeSpan.FromSeconds(episodes[i].End));
@@ -87,7 +74,7 @@ namespace MultiEpisodeSplitter.Services
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), args.Arguments);
 
-
+                // create a concat file for ffmpeg to use
                 List<string> files = new();
                 if (intro != null)
                     files.Add(tempFilename + ".intro.mkv");
@@ -99,7 +86,7 @@ namespace MultiEpisodeSplitter.Services
 
                 File.WriteAllLines(tempFilename + ".txt", files.Select(x => $"file '{x}'"));
 
-                //FFMpeg.Join(tempFilename + ".mkv", files.ToArray());
+                // and merge the episode with intro, episode and outro
                 var joinArgs = FFMpegArguments.FromFileInput(tempFilename + ".txt", verifyExists: true, delegate (FFMpegArgumentOptions options)
                 {
                     options.WithCustomArgument("-f concat -safe 0");
@@ -111,29 +98,6 @@ namespace MultiEpisodeSplitter.Services
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), joinArgs.Arguments);
             }
-
-
-            //// split
-            //string streamMaps = string.Join(' ', streams.Select(x => $"-map {x}"));
-
-            //string arguments = $"-i \"{file}\" -ss {start.ToString().Replace(',', '.')} -vcodec copy -c:a copy {streamMaps} \"{output}\"";
-            //if (end.HasValue)
-            //    arguments = $"-i \"{file}\" -ss {start.ToString().Replace(',', '.')} -to {end.Value.ToString().Replace(',', '.')} -vcodec copy -c:a copy {streamMaps} \"{output}\"";
-
-            //_ = StartFFMPEG(ffmpegPath, arguments);
-
-
-            //// create index file for ffmpeg to merge
-            //List<string> outputLines = new(files.Length);
-            //foreach (string file in files)
-            //    outputLines.Add($"file '{file}'");
-
-            //File.WriteAllLines(output, outputLines);
-
-
-            //// concat
-            //string streamMaps = string.Join(' ', streams.Select(x => $"-map {x}"));
-            //_ = StartFFMPEG(ffmpegPath, $"-f concat -safe 0 -i \"{inputList}\" -vcodec copy -c:a copy {streamMaps} \"{output}\"");
         }
 
         private static Task Start(string filePath, string arguments)
