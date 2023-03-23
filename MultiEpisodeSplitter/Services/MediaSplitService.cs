@@ -28,6 +28,10 @@ namespace MultiEpisodeSplitter.Services
         public async Task SplitMedia(string output, MediaInformation media, IEnumerable<SplitMarking> splits)
         {
             string tempFilename = Path.Combine(output, DateTime.Now.Ticks.ToString());
+            string extension = Path.GetExtension(media.FullPath);
+
+            string introFile = tempFilename + ".intro" + extension;
+            string outroFile = tempFilename + ".outro" + extension;
 
             var intro = splits.FirstOrDefault(x => x.IsIntro);
             if(intro != null)
@@ -35,11 +39,7 @@ namespace MultiEpisodeSplitter.Services
                 var args = FFMpegArguments.FromFileInput(media.FullPath, verifyExists: true, delegate (FFMpegArgumentOptions options)
                 {
                     options.Seek(TimeSpan.FromSeconds(intro.Start)).EndSeek(TimeSpan.FromSeconds(intro.End));
-                }).OutputToFile(tempFilename + ".intro.mkv", overwrite: true, delegate (FFMpegArgumentOptions options)
-                {
-                    options.CopyChannel();
-                    options.WithArgument(new CustomArgument("-map 0 -map -0:s"));
-                });
+                }).OutputToFile(introFile, overwrite: true, CopyChannelsWithoutSubtitles);
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), args.Arguments);
             }
@@ -50,51 +50,43 @@ namespace MultiEpisodeSplitter.Services
                 var args = FFMpegArguments.FromFileInput(media.FullPath, verifyExists: true, delegate (FFMpegArgumentOptions options)
                 {
                     options.Seek(TimeSpan.FromSeconds(outro.Start)).EndSeek(TimeSpan.FromSeconds(outro.End));
-                }).OutputToFile(tempFilename + ".outro.mkv", true, options =>
-                {
-                    options.CopyChannel();
-                    options.WithArgument(new CustomArgument("-map 0 -map -0:s"));
-                });
+                }).OutputToFile(outroFile, true, CopyChannelsWithoutSubtitles);
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), args.Arguments);
             }
 
+            var episodeNames = CalculateFileNames(media, splits).ToArray();
             var episodes = splits.Where(x => !x.IsIntro && !x.IsOutro).ToList();
             for(int i = 0; i < episodes.Count; i++)
             {
+                string episodeFile = tempFilename + ".ep" + (i + 1) + extension;
+
                 // split the episode
                 var args = FFMpegArguments.FromFileInput(media.FullPath, verifyExists: true, delegate (FFMpegArgumentOptions options)
                 {
                     options.Seek(TimeSpan.FromSeconds(episodes[i].Start)).EndSeek(TimeSpan.FromSeconds(episodes[i].End));
-                }).OutputToFile(tempFilename + ".ep" + (i + 1) + ".mkv", true, options =>
-                {
-                    options.CopyChannel();
-                    options.WithArgument(new CustomArgument("-map 0 -map -0:s"));
-                });
+                }).OutputToFile(episodeFile, true, CopyChannelsWithoutSubtitles);
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), args.Arguments);
 
                 // create a concat file for ffmpeg to use
                 List<string> files = new();
                 if (intro != null)
-                    files.Add(tempFilename + ".intro.mkv");
+                    files.Add(introFile);
 
-                files.Add(tempFilename + ".ep" + (i + 1) + ".mkv");
+                files.Add(episodeFile);
 
                 if (outro != null)
-                    files.Add(tempFilename + ".outro.mkv");
+                    files.Add(outroFile);
 
-                File.WriteAllLines(tempFilename + ".txt", files.Select(x => $"file '{x}'"));
+                string concatDataFile = tempFilename + ".ep" + (i + 1) + ".txt";
+                File.WriteAllLines(concatDataFile, files.Select(x => $"file '{x}'"));
 
                 // and merge the episode with intro, episode and outro
-                var joinArgs = FFMpegArguments.FromFileInput(tempFilename + ".txt", verifyExists: true, delegate (FFMpegArgumentOptions options)
+                var joinArgs = FFMpegArguments.FromFileInput(concatDataFile, verifyExists: true, delegate (FFMpegArgumentOptions options)
                 {
                     options.WithCustomArgument("-f concat -safe 0");
-                }).OutputToFile(tempFilename + ".ep" + (i + 1) + ".joined.mkv", true, options =>
-                {
-                    options.CopyChannel();
-                    options.WithArgument(new CustomArgument("-map 0 -map -0:s"));
-                });
+                }).OutputToFile(Path.Combine(output, episodeNames[i]), true, CopyChannelsWithoutSubtitles);
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), joinArgs.Arguments);
             }
@@ -117,6 +109,12 @@ namespace MultiEpisodeSplitter.Services
 
             proc.Start();
             return proc.WaitForExitAsync();
+        }
+
+        private static void CopyChannelsWithoutSubtitles(FFMpegArgumentOptions options)
+        {
+            options.CopyChannel();
+            options.WithArgument(new CustomArgument("-map 0 -map -0:s"));
         }
 
         public IEnumerable<string> CalculateFileNames(MediaInformation media, IEnumerable<SplitMarking> splits)
