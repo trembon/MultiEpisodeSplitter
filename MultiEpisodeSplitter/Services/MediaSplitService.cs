@@ -89,7 +89,13 @@ namespace MultiEpisodeSplitter.Services
                 }).OutputToFile(Path.Combine(output, episodeNames[i]), true, CopyChannelsWithoutSubtitles);
 
                 await Start(GlobalFFOptions.GetFFMpegBinaryPath(), joinArgs.Arguments);
+
+                File.Delete(concatDataFile);
+                File.Delete(episodeFile);
             }
+
+            if (intro != null) File.Delete(introFile);
+            if (outro != null) File.Delete(outroFile);
         }
 
         private static Task Start(string filePath, string arguments)
