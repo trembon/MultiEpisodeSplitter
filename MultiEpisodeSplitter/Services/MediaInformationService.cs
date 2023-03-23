@@ -1,5 +1,7 @@
 ﻿using FFMpegCore;
+using FFMpegCore.Pipes;
 using MultiEpisodeSplitter.Models;
+using System.Drawing;
 
 namespace MultiEpisodeSplitter.Services
 {
@@ -14,10 +16,16 @@ namespace MultiEpisodeSplitter.Services
     {
         public async Task<string> GetStillFromMediaAsBase64(MediaInformation media, int atSecond)
         {
-            var bitmap = await FFMpeg.SnapshotAsync(media.FullPath, media.Size, TimeSpan.FromSeconds(atSecond));
-
+            var args = SnapshotArgumentBuilder.BuildSnapshotArguments(media.FullPath, media.MediaData, media.Size, TimeSpan.FromSeconds(atSecond));
             using var ms = new MemoryStream();
-            bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+
+            await args.Item1
+                .OutputToPipe(new StreamPipeSink(ms), options => args.outputOptions(options.ForceFormat("rawvideo")))
+                .ProcessAsynchronously();
+
+            ms.Position = 0;
+            using var bitmap = new Bitmap(ms);
+            bitmap.Clone(new Rectangle(0, 0, bitmap.Width, bitmap.Height), bitmap.PixelFormat);
 
             return string.Format("data:image/jpeg;base64,{0}", Convert.ToBase64String(ms.GetBuffer()));
         }

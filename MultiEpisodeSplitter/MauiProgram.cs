@@ -1,4 +1,5 @@
-﻿using FFMpegCore;
+﻿using CommunityToolkit.Maui;
+using FFMpegCore;
 using MultiEpisodeSplitter.Services;
 
 namespace MultiEpisodeSplitter;
@@ -10,6 +11,7 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
+			.UseMauiCommunityToolkit()
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using MultiEpisodeSplitter.Models;
 @using MultiEpisodeSplitter.Services;
+@using CommunityToolkit.Maui.Storage;
 @inject IMediaInformationService mediaInformationService;
 @inject IMediaSplitService mediaSplitService;
 
@@ -120,6 +121,24 @@
     {
         splits.Remove(split);
     }
+
+    private async Task StartProcess()
+    {
+        var result = await FolderPicker.Default.PickAsync(CancellationToken.None);
+        if (result.IsSuccessful)
+        {
+            await this.DisplaySpinner.InvokeAsync(true);
+            try
+            {
+                await mediaSplitService.SplitMedia(result.Folder.Path, currentMedia, splits);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            await this.DisplaySpinner.InvokeAsync(false);
+        }
+    }
 }
 
 <div class="row">
@@ -194,5 +213,9 @@
         {
             <p>@filename</p>
         }
+
+        <hr/>
+
+        <button class="btn btn-primary" @onclick=StartProcess disabled="@(currentMedia == null && splits.Any())">Process</button>
     </div>
 </div>
