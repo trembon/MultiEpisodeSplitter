@@ -2,8 +2,8 @@
 @using MultiEpisodeSplitter.Models;
 @using MultiEpisodeSplitter.Services;
 @using CommunityToolkit.Maui.Storage;
-@inject IMediaInformationService mediaInformationService;
 @inject IMediaSplitService mediaSplitService;
+@inject IMediaInformationService mediaInformationService;
 
 @code {
     private const string STATUS_WARNING = "warning";
@@ -131,10 +131,14 @@
             try
             {
                 await mediaSplitService.SplitMedia(result.Folder.Path, currentMedia, splits);
+
+                status = STATUS_SUCCESS;
+                statusText = "The episode split is now done!";
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                status = STATUS_ERROR;
+                statusText = "Something went wrong: " + ex.Message;
             }
             await this.DisplaySpinner.InvokeAsync(false);
         }
@@ -216,6 +220,6 @@
 
         <hr/>
 
-        <button class="btn btn-primary" @onclick=StartProcess disabled="@(currentMedia == null && splits.Any())">Process</button>
+        <button class="btn btn-primary" @onclick=StartProcess disabled="@(currentMedia == null || !splits.Any())">Process</button>
     </div>
 </div>
